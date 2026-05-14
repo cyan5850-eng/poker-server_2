@@ -1,0 +1,20 @@
+{
+  "name": "poker",
+  "version": "1.0.0",
+  "description": "德州扑克游戏服务器",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.20.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
