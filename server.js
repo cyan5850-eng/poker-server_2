@@ -205,7 +205,7 @@ class Room {
     this.phase = 'preflop';
     for (const p of this.players) {
       p.hand = [this.deck.pop(), this.deck.pop()];
-      p.bet = 0; p.folded = false; p.allIn = false; p.handResult = null;
+      p.bet = 0; p.folded = false; p.allIn = false; p.handResult = null; p.hasActed = false;
     }
     const n = this.players.length;
     const sbIdx = (this.dealerIdx + 1) % n;
@@ -235,24 +235,36 @@ class Room {
     const idx = this.currentIdx;
 
     if (action === 'fold') {
-      p.folded = true;
+      p.folded = true; p.hasActed = true;
       this.broadcast({ type: 'chat', msg: `${p.name} 弃牌`, system: true });
     } else if (action === 'check') {
       if (p.bet < this.currentBet) return;
+      p.hasActed = true;
       this.broadcast({ type: 'chat', msg: `${p.name} 过牌`, system: true });
     } else if (action === 'call') {
       const actual = this.placeBet(idx, this.currentBet - p.bet);
+      p.hasActed = true;
       this.broadcast({ type: 'chat', msg: `${p.name} 跟注 ${actual}`, system: true });
     } else if (action === 'raise') {
       const ra = Math.max(amount, this.currentBet + this.bigBlind);
       const capped = Math.min(ra, p.chips + p.bet);
       this.placeBet(idx, capped - p.bet);
       this.currentBet = p.bet;
+      p.hasActed = true;
+      for (const other of this.players) {
+        if (other.id !== p.id && !other.folded && !other.allIn) other.hasActed = false;
+      }
       this.broadcast({ type: 'chat', msg: `${p.name} 加注到 ${this.currentBet}`, system: true });
     } else if (action === 'allin') {
       const nb = p.bet + p.chips;
-      if (nb > this.currentBet) this.currentBet = nb;
+      if (nb > this.currentBet) {
+        this.currentBet = nb;
+        for (const other of this.players) {
+          if (other.id !== p.id && !other.folded && !other.allIn) other.hasActed = false;
+        }
+      }
       this.placeBet(idx, p.chips);
+      p.hasActed = true;
       this.broadcast({ type: 'chat', msg: `${p.name} 全押！共 ${p.bet}`, system: true });
     }
     this.advance();
@@ -294,9 +306,10 @@ class Room {
   }
 
   roundComplete() {
+    // 每个活跃玩家都必须已行动，且注码已匹配
     return this.players
       .filter(p => !p.folded && !p.allIn && !p.disconnected)
-      .every(p => p.bet >= this.currentBet);
+      .every(p => p.hasActed && p.bet >= this.currentBet);
   }
 
   setActionTimer() {
@@ -313,7 +326,7 @@ class Room {
   }
 
   nextPhase() {
-    for (const p of this.players) p.bet = 0;
+    for (const p of this.players) { p.bet = 0; p.hasActed = false; }
     this.currentBet = 0;
     const phases = ['preflop','flop','turn','river','showdown'];
     const i = phases.indexOf(this.phase);
